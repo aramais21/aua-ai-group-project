@@ -16,10 +16,12 @@ from monopoly_simulator import initialize_game_elements
 from monopoly_simulator.action_choices import roll_die
 import numpy as np
 from monopoly_simulator.card_utility_actions import move_player_after_die_roll
-from monopoly_simulator import background_agent_v1
-from monopoly_simulator import background_agent_v2
-from monopoly_simulator import background_agent_v3
-from monopoly_simulator import simple_decision_agent_1
+# from monopoly_simulator import background_agent_v1
+# from monopoly_simulator import background_agent_v2
+# from monopoly_simulator import background_agent_v3
+# from monopoly_simulator import simple_decision_agent_1
+from monopoly_simulator import background_agent_v3_1
+from monopoly_simulator import mcts_background_agent_withTuned
 from monopoly_simulator import diagnostics
 from monopoly_simulator import novelty_generator
 from monopoly_simulator.agent import Agent
@@ -705,10 +707,10 @@ except:
 ##Logs game play in the single_tournament folder
 logger = log_file_create('../single_tournament/seed_6.log')
 player_decision_agents = dict()
-player_decision_agents['player_1'] = Agent(**background_agent_v1.decision_agent_methods)
-player_decision_agents['player_2'] = Agent(**background_agent_v1.decision_agent_methods)
-player_decision_agents['player_3'] = Agent(**background_agent_v1.decision_agent_methods)
-player_decision_agents['player_4'] = Agent(**background_agent_v1.decision_agent_methods)
+player_decision_agents['player_1'] = Agent(**background_agent_v3_1.decision_agent_methods)
+player_decision_agents['player_2'] = Agent(**background_agent_v3_1.decision_agent_methods)
+player_decision_agents['player_3'] = Agent(**background_agent_v3_1.decision_agent_methods)
+player_decision_agents['player_4'] = Agent(**mcts_background_agent_withTuned.decision_agent_methods)
 game_elements = set_up_board('../monopoly_game_schema_v1-2.json',
                              player_decision_agents)
 inject_class_novelty_1(game_elements)
