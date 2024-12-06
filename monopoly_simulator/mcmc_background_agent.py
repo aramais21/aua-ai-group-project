@@ -62,7 +62,7 @@ def make_bid(player, current_gameboard, asset, current_bid):
         return current_bid + (max_bid - current_bid) // 2
     return 0
 
-def _mcmc_decision(player, current_gameboard, allowable_moves, code, phase, num_simulations=100):
+def _mcmc_decision(player, current_gameboard, allowable_moves, code, phase, num_simulations=1500):
     """
     Core MCMC decision logic shared by pre-roll, post-roll, and out-of-turn phases.
     """

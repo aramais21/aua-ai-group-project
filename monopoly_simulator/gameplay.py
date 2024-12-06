@@ -3,6 +3,11 @@ from monopoly_simulator.action_choices import roll_die
 import numpy as np
 from monopoly_simulator import card_utility_actions
 from monopoly_simulator import background_agent_v3_1
+from monopoly_simulator import mcts_background_agent
+from monopoly_simulator import mcts_background_agent_withTuned
+from monopoly_simulator import mcts_background_agent_withQRAVE
+from monopoly_simulator import mcts_background_agent_withGlobalRAVE
+from monopoly_simulator import mcts_background_agent_withSeasonalQRAVE1
 from monopoly_simulator import read_write_current_state
 import json
 from monopoly_simulator import novelty_generator
@@ -15,6 +20,7 @@ from monopoly_simulator.logging_info import log_file_create
 import os
 import time
 import logging
+
 logger = logging.getLogger('monopoly_simulator.logging_info')
 
 
@@ -66,7 +72,7 @@ def simulate_game_instance(game_elements, history_log_file=None, np_seed=2):
     game_elements['seed'] = np_seed
     game_elements['card_seed'] = np_seed
     game_elements['choice_function'] = np.random.choice
-    count_json = 0   # a counter to keep track of how many rounds the game has to be played before storing the current_state of gameboard to file.
+    count_json = 0  # a counter to keep track of how many rounds the game has to be played before storing the current_state of gameboard to file.
     num_die_rolls = 0
     tot_time = 0
     # game_elements['go_increment'] = 100 # we should not be modifying this here. It is only for testing purposes.
@@ -226,10 +232,10 @@ def simulate_game_instance(game_elements, history_log_file=None, np_seed=2):
             logger.debug("Game ran for " + str(tot_time) + " seconds.")
             break
 
-        #This is an example of how you may want to write out gameboard state to file.
-        #Uncomment the following piece of code to write out the gameboard current_state to file at the "count_json" iteration.
-        #All the data from game_elements will be written to a .json file which can be read back to intialize a new game with
-        #those gameboard values to start the game from that point onwards.
+        # This is an example of how you may want to write out gameboard state to file.
+        # Uncomment the following piece of code to write out the gameboard current_state to file at the "count_json" iteration.
+        # All the data from game_elements will be written to a .json file which can be read back to intialize a new game with
+        # those gameboard values to start the game from that point onwards.
         '''
         if count_json == 50:
             outfile = '../current_gameboard_state.json'
@@ -270,7 +276,7 @@ def simulate_game_instance(game_elements, history_log_file=None, np_seed=2):
             return winner.player_name
         else:
             logger.debug('Game has no winner, do not know what went wrong!!!')
-            return None     # ideally should never get here
+            return None  # ideally should never get here
 
 
 def set_up_board(game_schema_file_path, player_decision_agents):
@@ -298,12 +304,12 @@ def inject_novelty(current_gameboard, novelty_schema=None):
 
     numberDieNovelty = novelty_generator.NumberClassNovelty()
     numberDieNovelty.die_novelty(current_gameboard, 4, die_state_vector=[[1,2,3,4,5],[1,2,3,4],[5,6,7],[2,3,4]])
-    
+
     classDieNovelty = novelty_generator.TypeClassNovelty()
     die_state_distribution_vector = ['uniform','uniform','biased','biased']
     die_type_vector = ['odd_only','even_only','consecutive','consecutive']
     classDieNovelty.die_novelty(current_gameboard, die_state_distribution_vector, die_type_vector)
-    
+
     classCardNovelty = novelty_generator.TypeClassNovelty()
     novel_cc = dict()
     novel_cc["street_repairs"] = "alternate_contingency_function_1"
@@ -319,7 +325,7 @@ def inject_novelty(current_gameboard, novelty_schema=None):
     #On playing the game it is verified that the newly added property to the color group is taken into account for monopolizing a color group,
     # i,e the orchid color group now has Baltic Avenue besides St. Charles Place, States Avenue and Virginia Avenue. The player acquires a monopoly
     # only on the ownership of all the 4 properties in this case.
-    
+
     inanimateNovelty = novelty_generator.InanimateAttributeNovelty()
     inanimateNovelty.map_property_set_to_color(current_gameboard, [current_gameboard['location_objects']['Park Place'], current_gameboard['location_objects']['Boardwalk']], 'Brown')
     inanimateNovelty.map_property_to_color(current_gameboard, current_gameboard['location_objects']['Baltic Avenue'], 'Orchid')
@@ -365,17 +371,17 @@ def play_game(index):
     # for p in ['player_1','player_3']:
     #     player_decision_agents[p] = simple_decision_agent_1.decision_agent_methods
 
-    player_decision_agents['player_1'] = Agent(**mcmc_background_agent.decision_agent_methods)
-    player_decision_agents['player_2'] = Agent(**mcmc_background_agent.decision_agent_methods)
-    player_decision_agents['player_3'] = Agent(**mcmc_background_agent.decision_agent_methods)
-    player_decision_agents['player_4'] = Agent(**mcmc_background_agent.decision_agent_methods)
+    player_decision_agents['player_1'] = Agent(**mcts_background_agent.decision_agent_methods)
+    player_decision_agents['player_2'] = Agent(**mcts_background_agent_withTuned.decision_agent_methods)
+    player_decision_agents['player_3'] = Agent(**mcts_background_agent_withQRAVE.decision_agent_methods)
+    player_decision_agents['player_4'] = Agent(**background_agent_v3_1.decision_agent_methods)
 
     game_elements = set_up_board('../monopoly_game_schema_v1-2.json',
                                  player_decision_agents)
 
-    #Comment out the above line and uncomment the piece of code to read the gameboard state from an existing json file so that
-    #the game starts from a particular game state instead of initializing the gameboard with default start values.
-    #Note that the novelties introduced in that particular game which was saved to file will be loaded into this game board as well.
+    # Comment out the above line and uncomment the piece of code to read the gameboard state from an existing json file so that
+    # the game starts from a particular game state instead of initializing the gameboard with default start values.
+    # Note that the novelties introduced in that particular game which was saved to file will be loaded into this game board as well.
     '''
     logger.debug("Loading gameboard from an existing game state that was saved to file.")
     infile = '../current_gameboard_state.json'
@@ -394,9 +400,9 @@ def play_game(index):
         logger.debug("Sucessfully initialized all player agents.")
         winner = simulate_game_instance(game_elements)
         if player_decision_agents['player_1'].shutdown() == flag_config_dict['failure_code'] or \
-            player_decision_agents['player_2'].shutdown() == flag_config_dict['failure_code'] or \
-            player_decision_agents['player_3'].shutdown() == flag_config_dict['failure_code'] or \
-            player_decision_agents['player_4'].shutdown() == flag_config_dict['failure_code']:
+                player_decision_agents['player_2'].shutdown() == flag_config_dict['failure_code'] or \
+                player_decision_agents['player_3'].shutdown() == flag_config_dict['failure_code'] or \
+                player_decision_agents['player_4'].shutdown() == flag_config_dict['failure_code']:
             logger.error("Error in agent shutdown.")
             handlers_copy = logger.handlers[:]
             for handler in handlers_copy:
@@ -416,21 +422,29 @@ def play_game(index):
 
 
 def play_game_in_tournament(game_seed, novelty_info=False, inject_novelty_function=None):
-    logger.debug('seed used: ' + str(game_seed))
+    # logger.debug('seed used: ' + str(game_seed))
     player_decision_agents = dict()
     # for p in ['player_1','player_3']:
     #     player_decision_agents[p] = simple_decision_agent_1.decision_agent_methods
-    player_decision_agents['player_1'] = Agent(**mcmc_background_agent.decision_agent_methods)
-    player_decision_agents['player_2'] = Agent(**background_agent_v3_1.decision_agent_methods)
-    player_decision_agents['player_3'] = Agent(**background_agent_v3_1.decision_agent_methods)
-    player_decision_agents['player_4'] = Agent(**mcmc_background_agent.decision_agent_methods)
+    player_decision_agents['player_1'] = Agent(**mcts_background_agent.decision_agent_methods)
+    player_decision_agents['player_2'] = Agent(**mcts_background_agent_withTuned.decision_agent_methods)
+    player_decision_agents['player_3'] = Agent(**mcts_background_agent_withQRAVE.decision_agent_methods)
+    player_decision_agents['player_4'] = Agent(**background_agent_v3_1.decision_agent_methods)
 
     game_elements = set_up_board('../monopoly_game_schema_v1-2.json',
                                  player_decision_agents)
-    
-    #Comment out the above line and uncomment the piece of code to read the gameboard state from an existing json file so that
-    #the game starts from a particular game state instead of initializing the gameboard with default start values.
-    #Note that the novelties introduced in that particular game which was saved to file will be loaded into this game board as well.
+
+    try:
+        os.makedirs('../monopoly_test/')
+        print('Creating folder and logging gameplay.')
+    except:
+        print('Logging gameplay.')
+
+    logger = log_file_create(f'../monopoly_test/Game_{game_seed}.log')
+
+    # Comment out the above line and uncomment the piece of code to read the gameboard state from an existing json file so that
+    # the game starts from a particular game state instead of initializing the gameboard with default start values.
+    # Note that the novelties introduced in that particular game which was saved to file will be loaded into this game board as well.
     '''
     logger.debug("Loading gameboard from an existing game state that was saved to file.")
     infile = '../current_gameboard_state.json'
@@ -462,10 +476,14 @@ def play_game_in_tournament(game_seed, novelty_info=False, inject_novelty_functi
                 return winner
     else:
         if inject_novelty_function:
-            if player_decision_agents['player_1'].startup(game_elements, indicator=True) == flag_config_dict['failure_code'] or \
-                    player_decision_agents['player_2'].startup(game_elements, indicator=True) == flag_config_dict['failure_code'] or \
-                    player_decision_agents['player_3'].startup(game_elements, indicator=True) == flag_config_dict['failure_code'] or \
-                    player_decision_agents['player_4'].startup(game_elements, indicator=True) == flag_config_dict['failure_code']:
+            if player_decision_agents['player_1'].startup(game_elements, indicator=True) == flag_config_dict[
+                'failure_code'] or \
+                    player_decision_agents['player_2'].startup(game_elements, indicator=True) == flag_config_dict[
+                'failure_code'] or \
+                    player_decision_agents['player_3'].startup(game_elements, indicator=True) == flag_config_dict[
+                'failure_code'] or \
+                    player_decision_agents['player_4'].startup(game_elements, indicator=True) == flag_config_dict[
+                'failure_code']:
                 logger.error("Error in initializing agents. Cannot play the game.")
                 return None
             else:
@@ -482,10 +500,14 @@ def play_game_in_tournament(game_seed, novelty_info=False, inject_novelty_functi
                     logger.debug("GAME OVER")
                     return winner
         else:
-            if player_decision_agents['player_1'].startup(game_elements, indicator=False) == flag_config_dict['failure_code'] or \
-                    player_decision_agents['player_2'].startup(game_elements, indicator=False) == flag_config_dict['failure_code'] or \
-                    player_decision_agents['player_3'].startup(game_elements, indicator=False) == flag_config_dict['failure_code'] or \
-                    player_decision_agents['player_4'].startup(game_elements, indicator=False) == flag_config_dict['failure_code']:
+            if player_decision_agents['player_1'].startup(game_elements, indicator=False) == flag_config_dict[
+                'failure_code'] or \
+                    player_decision_agents['player_2'].startup(game_elements, indicator=False) == flag_config_dict[
+                'failure_code'] or \
+                    player_decision_agents['player_3'].startup(game_elements, indicator=False) == flag_config_dict[
+                'failure_code'] or \
+                    player_decision_agents['player_4'].startup(game_elements, indicator=False) == flag_config_dict[
+                'failure_code']:
                 logger.error("Error in initializing agents. Cannot play the game.")
                 return None
             else:
@@ -503,19 +525,57 @@ def play_game_in_tournament(game_seed, novelty_info=False, inject_novelty_functi
                     return winner
 
 
-# Initialize the win counts dictionary
+import time
+start = time.time()
+
 win_counts = {}
+try:
+    total_games = 5
 
-# Simulate 100 games in the tournament
-for _ in range(0, 100):
-    winner = play_game_in_tournament(_, True, None)
-    # Update the win counts for the winner
-    if winner in win_counts:
-        win_counts[winner] += 1
-    else:
-        win_counts[winner] = 1
+    for seed in range(total_games):
+        winner = play_game_in_tournament(seed)
 
-# Print the win counts at the end of the tournament
-print("Tournament Results:")
+        if winner in win_counts:
+            win_counts[winner] += 1
+        else:
+            win_counts[winner] = 1
+
+except KeyboardInterrupt:
+    print("Saving data...")
+
+end = time.time()
+
 for player, count in win_counts.items():
     print(f"{player}: {count} wins")
+print(f"Time Elapsed: {end - start}")
+
+
+"""
+try:
+    total_games = 1000
+    batch_size = 100
+    inject_novelty = False
+    inject_novelty_function = None
+
+    for batch_num in range(1, (total_games // batch_size) + 1):
+        win_counts = {}
+
+        # Play a batch of games
+        for game_num in range((batch_num - 1) * batch_size, batch_num * batch_size):
+            winner = play_game_in_tournament(game_seed=game_num,
+                                             novelty_info=inject_novelty,
+                                             inject_novelty_function=inject_novelty_function)
+            if winner:
+                win_counts[winner] = win_counts.get(winner, 0) + 1
+            else:
+                logger.warning(f"Game {game_num} did not produce a valid winner.")
+
+        print(f"\n--- Iteration {batch_num} ---")
+        for player, count in win_counts.items():
+            print(f"{player}: {count} wins")
+        print("-" * 30)
+
+except KeyboardInterrupt:
+    print("Saving data...")
+    print("Data saved. Exiting.")
+"""
