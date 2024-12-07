@@ -6,6 +6,7 @@ from monopoly_simulator import background_agent_v3_1
 from monopoly_simulator import mcts_background_agent
 from monopoly_simulator import mcts_background_agent_withTuned
 from monopoly_simulator import mcts_background_agent_withQRAVE
+from monopoly_simulator import mcmc_agent_based_on_landing_possibility
 from monopoly_simulator import mcts_background_agent_withGlobalRAVE
 from monopoly_simulator import mcts_background_agent_withSeasonalQRAVE1
 from monopoly_simulator import read_write_current_state
@@ -371,9 +372,9 @@ def play_game(index):
     # for p in ['player_1','player_3']:
     #     player_decision_agents[p] = simple_decision_agent_1.decision_agent_methods
 
-    player_decision_agents['player_1'] = Agent(**mcts_background_agent.decision_agent_methods)
-    player_decision_agents['player_2'] = Agent(**mcts_background_agent_withTuned.decision_agent_methods)
-    player_decision_agents['player_3'] = Agent(**mcts_background_agent_withQRAVE.decision_agent_methods)
+    player_decision_agents['player_1'] = Agent(**background_agent_v3_1.decision_agent_methods)
+    player_decision_agents['player_2'] = Agent(**background_agent_v3_1.decision_agent_methods)
+    player_decision_agents['player_3'] = Agent(**mcmc_agent_based_on_landing_possibility.decision_agent_methods)
     player_decision_agents['player_4'] = Agent(**background_agent_v3_1.decision_agent_methods)
 
     game_elements = set_up_board('../monopoly_game_schema_v1-2.json',
@@ -530,7 +531,7 @@ start = time.time()
 
 win_counts = {}
 try:
-    total_games = 5
+    total_games = 100
 
     for seed in range(total_games):
         winner = play_game_in_tournament(seed)
