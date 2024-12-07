@@ -7,8 +7,11 @@ from monopoly_simulator import mcts_background_agent
 from monopoly_simulator import mcts_background_agent_withTuned
 from monopoly_simulator import mcts_background_agent_withQRAVE
 from monopoly_simulator import mcmc_agent_based_on_landing_possibility
+from monopoly_simulator import mcts_background_agent2
+from monopoly_simulator import mcts_background_withEXP
+from monopoly_simulator import mcts_background_agent_withEXP2
 from monopoly_simulator import mcts_background_agent_withGlobalRAVE
-from monopoly_simulator import mcts_background_agent_withSeasonalQRAVE1
+from monopoly_simulator import mcts_background_agent_withSeasonalQRAVE
 from monopoly_simulator import read_write_current_state
 import json
 from monopoly_simulator import novelty_generator
@@ -372,10 +375,10 @@ def play_game(index):
     # for p in ['player_1','player_3']:
     #     player_decision_agents[p] = simple_decision_agent_1.decision_agent_methods
 
-    player_decision_agents['player_1'] = Agent(**background_agent_v3_1.decision_agent_methods)
-    player_decision_agents['player_2'] = Agent(**background_agent_v3_1.decision_agent_methods)
-    player_decision_agents['player_3'] = Agent(**mcmc_agent_based_on_landing_possibility.decision_agent_methods)
-    player_decision_agents['player_4'] = Agent(**background_agent_v3_1.decision_agent_methods)
+    player_decision_agents['player_1'] = Agent(**mcts_background_agent_withTuned.decision_agent_methods)
+    player_decision_agents['player_2'] = Agent(**mcts_background_agent.decision_agent_methods)
+    player_decision_agents['player_3'] = Agent(**mcts_background_agent_withEXP2.decision_agent_methods)
+    player_decision_agents['player_4'] = Agent(**mcts_background_withEXP.decision_agent_methods)
 
     game_elements = set_up_board('../monopoly_game_schema_v1-2.json',
                                  player_decision_agents)
@@ -423,25 +426,25 @@ def play_game(index):
 
 
 def play_game_in_tournament(game_seed, novelty_info=False, inject_novelty_function=None):
-    # logger.debug('seed used: ' + str(game_seed))
+    logger.debug('seed used: ' + str(game_seed))
     player_decision_agents = dict()
     # for p in ['player_1','player_3']:
     #     player_decision_agents[p] = simple_decision_agent_1.decision_agent_methods
-    player_decision_agents['player_1'] = Agent(**mcts_background_agent.decision_agent_methods)
-    player_decision_agents['player_2'] = Agent(**mcts_background_agent_withTuned.decision_agent_methods)
-    player_decision_agents['player_3'] = Agent(**mcts_background_agent_withQRAVE.decision_agent_methods)
-    player_decision_agents['player_4'] = Agent(**background_agent_v3_1.decision_agent_methods)
+    player_decision_agents['player_1'] = Agent(**mcts_background_agent2.decision_agent_methods)
+    player_decision_agents['player_2'] = Agent(**background_agent_v3_1.decision_agent_methods)
+    player_decision_agents['player_3'] = Agent(**mcts_background_agent_withEXP2.decision_agent_methods)
+    player_decision_agents['player_4'] = Agent(**mcts_background_withEXP.decision_agent_methods)
 
     game_elements = set_up_board('../monopoly_game_schema_v1-2.json',
                                  player_decision_agents)
 
-    try:
-        os.makedirs('../monopoly_test/')
-        print('Creating folder and logging gameplay.')
-    except:
-        print('Logging gameplay.')
-
-    logger = log_file_create(f'../monopoly_test/Game_{game_seed}.log')
+    # try:
+    #     os.makedirs('../monopoly_test/')
+    #     print('Creating folder and logging gameplay.')
+    # except:
+    #     print('Logging gameplay.')
+    #
+    # logger = log_file_create(f'../monopoly_test/Game_{game_seed}.log')
 
     # Comment out the above line and uncomment the piece of code to read the gameboard state from an existing json file so that
     # the game starts from a particular game state instead of initializing the gameboard with default start values.
@@ -531,7 +534,7 @@ start = time.time()
 
 win_counts = {}
 try:
-    total_games = 100
+    total_games = 1000
 
     for seed in range(total_games):
         winner = play_game_in_tournament(seed)
@@ -546,6 +549,7 @@ except KeyboardInterrupt:
 
 end = time.time()
 
+print("Tuned, V1, EXP2, EXP")
 for player, count in win_counts.items():
     print(f"{player}: {count} wins")
 print(f"Time Elapsed: {end - start}")
