@@ -430,10 +430,10 @@ def play_game_in_tournament(game_seed, novelty_info=False, inject_novelty_functi
     player_decision_agents = dict()
     # for p in ['player_1','player_3']:
     #     player_decision_agents[p] = simple_decision_agent_1.decision_agent_methods
-    player_decision_agents['player_1'] = Agent(**mcts_background_agent2.decision_agent_methods)
-    player_decision_agents['player_2'] = Agent(**background_agent_v3_1.decision_agent_methods)
-    player_decision_agents['player_3'] = Agent(**mcts_background_agent_withEXP2.decision_agent_methods)
-    player_decision_agents['player_4'] = Agent(**mcts_background_withEXP.decision_agent_methods)
+    player_decision_agents['player_1'] = Agent(**background_agent_v3_1.decision_agent_methods)
+    player_decision_agents['player_2'] = Agent(**mcmc_agent_based_on_landing_possibility.decision_agent_methods)
+    player_decision_agents['player_3'] = Agent(**background_agent_v3_1.decision_agent_methods)
+    player_decision_agents['player_4'] = Agent(**background_agent_v3_1.decision_agent_methods)
 
     game_elements = set_up_board('../monopoly_game_schema_v1-2.json',
                                  player_decision_agents)
@@ -536,7 +536,7 @@ win_counts = {}
 try:
     total_games = 1000
 
-    for seed in range(total_games):
+    for seed in range(6000, 6000+total_games):
         winner = play_game_in_tournament(seed)
 
         if winner in win_counts:
@@ -549,7 +549,7 @@ except KeyboardInterrupt:
 
 end = time.time()
 
-print("Tuned, V1, EXP2, EXP")
+print("Background, MCMC_LANDING(SIM_COUNT=500), Background, Background")
 for player, count in win_counts.items():
     print(f"{player}: {count} wins")
 print(f"Time Elapsed: {end - start}")

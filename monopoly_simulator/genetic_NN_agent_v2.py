@@ -1,29 +1,29 @@
 import os
 import copy
 import random
+import json
 import numpy as np
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import Dense, Input
 from tensorflow.keras.optimizers import Adam
 import logging
-from skopt import forest_minimize
-from skopt.space import Real, Integer
 
-from monopoly_simulator import background_agent_v3_1, mcmc_background_agent, Hybrid_ANN_background, \
-    initialize_game_elements, genetic_NN_agent
+from monopoly_simulator import background_agent_v3_1, mcmc_agent_based_on_landing_possibility, Hybrid_ANN_background, \
+    initialize_game_elements
 from monopoly_simulator.agent import Agent
 from monopoly_simulator.mcmc_background_agent import _simulate_action
 
 # Logger setup
 logger = logging.getLogger('monopoly_simulator.logging_info.genetic_nn_agent')
 
-# Define the search space for hyperparameters
-search_space = [
-    Real(1e-5, 1e-2, name='learning_rate'),  # Learning rate
-    Integer(64, 1024, name='hidden_layer_1'),  # Number of neurons in the first hidden layer
-    Integer(32, 256, name='batch_size'),  # Batch size
-    Real(0.9, 0.999, name='gamma')  # Discount factor (gamma)
-]
+# Example hyperparameter ranges for optimization
+HYPERPARAMETER_RANGES = {
+    "learning_rate": [1e-5, 1e-2],
+    "hidden_layer_1": [64, 1024],
+    "hidden_layer_2": [32, 512],
+    "batch_size": [32, 256],
+    "gamma": [0.9, 0.999],
+}
 
 
 def initialize_model(hyperparameters):
@@ -55,112 +55,154 @@ def encode_game_state(player, current_gameboard):
 
     # Encode property ownership
     for i, location in enumerate(current_gameboard['location_sequence']):
+        # Skip locations that don't have an 'owner' attribute
         if hasattr(location, 'owner'):
             state[2 + i] = 1 if location.owner == player else 0
 
     return state
 
 
-def evaluate_model(hyperparameters):
+def genetic_algorithm_optimization(num_generations, population_size):
     """
-    Evaluate the model with the given hyperparameters by running simulations.
+    Genetic algorithm to optimize hyperparameters.
     """
-    learning_rate, hidden_layer_1, batch_size, gamma = hyperparameters
+    def generate_random_hyperparameters():
+        return {
+            "learning_rate": 10 ** random.uniform(np.log10(HYPERPARAMETER_RANGES["learning_rate"][0]),
+                                                  np.log10(HYPERPARAMETER_RANGES["learning_rate"][1])),
+            "hidden_layer_1": random.randint(HYPERPARAMETER_RANGES["hidden_layer_1"][0],
+                                             HYPERPARAMETER_RANGES["hidden_layer_1"][1]),
+            "batch_size": random.randint(HYPERPARAMETER_RANGES["batch_size"][0],
+                                         HYPERPARAMETER_RANGES["batch_size"][1]),
+            "gamma": random.uniform(HYPERPARAMETER_RANGES["gamma"][0], HYPERPARAMETER_RANGES["gamma"][1]),
+        }
 
-    # Construct a dictionary for the hyperparameters
-    hyperparameters_dict = {
-        "learning_rate": learning_rate,
-        "hidden_layer_1": hidden_layer_1,
-        "batch_size": batch_size,
-        "gamma": gamma
-    }
+    def evaluate_hyperparameters(hyperparameters):
+        """
+        Evaluate hyperparameters by training the model for a few episodes and returning a fitness score.
+        """
+        model = initialize_model(hyperparameters)
+        total_reward = 0
 
-    # Initialize the model
-    model = initialize_model(hyperparameters_dict)
-    total_reward = 0
-
-    # Run a few simulated games and compute average reward
-    for _ in range(5):  # Simulate 5 games
-        reward = run_simulation(model, hyperparameters_dict)
-        total_reward += reward
-
-    return -total_reward / 5  # Return negative for minimization
-
-
-
-def run_simulation(model, hyperparameters):
-    """
-    Simulates a Monopoly game and evaluates the performance of the genetic NN agent.
-    """
-    import json
-    game_schema_file_path = '/Users/taron.schisas/Desktop/PycharmProjects/GNOME-p3/monopoly_game_schema_v1-2.json'
-    game_schema = json.load(open(game_schema_file_path, 'r'))
-    player_decision_agents = {
-        'player_1': Agent(**background_agent_v3_1.decision_agent_methods),
-        'player_2': Agent(**mcmc_background_agent.decision_agent_methods),
-        'player_3': Agent(**genetic_NN_agent.nn_decision_agent_methods),  # Genetic NN agent
-        'player_4': Agent(**background_agent_v3_1.decision_agent_methods),
-    }
-    game_elements = initialize_game_elements.initialize_board(game_schema, player_decision_agents)
-
-    player_3 = game_elements['players'][2]  # Assuming player_3 is at index 2
-    simulated_gameboard = copy.deepcopy(game_elements)
-
-    total_reward = 0
-    for _ in range(50):  # Simulate 50 decision steps
-        allowable_moves = ["buy_property", "skip_turn", "roll_dice", "end_turn"]  # Example
-        action_probs = model.predict(encode_game_state(player_3, simulated_gameboard)[np.newaxis, :])[0]
-        action_index = np.argmax(action_probs)
-        chosen_action = allowable_moves[action_index] if action_index < len(allowable_moves) else "skip_turn"
-
-        try:
-            reward = _simulate_action(
-                getattr(player_decision_agents['player_3'], chosen_action, None),
-                {},
-                player_3,
-                simulated_gameboard,
-                num_simulations=1,
-            )
+        # Run a few simulated games and compute average reward
+        for _ in range(5):  # Simulate 5 games
+            reward = run_simulation(model, hyperparameters)
             total_reward += reward
-        except Exception as e:
-            logger.warning(f"Error during simulation: {e}")
-            continue
 
-    return total_reward
+        return total_reward / 5  # Average reward
+
+    def run_simulation(model, hyperparameters):
+        """
+        Simulates a Monopoly game and evaluates the performance of the genetic NN agent.
+        Reward is based on the final cash of the genetic NN agent.
+        """
+
+        # Initialize player agents
+        player_decision_agents = {
+            'player_1': Agent(**background_agent_v3_1.decision_agent_methods),
+            'player_2': Agent(**mcmc_agent_based_on_landing_possibility.decision_agent_methods),
+            'player_3': Agent(**genetic_NN_agent.nn_decision_agent_methods),  # Genetic NN agent
+            'player_4': Agent(**background_agent_v3_1.decision_agent_methods),
+        }
+
+        game_schema_file_path = '/Users/taron.schisas/Desktop/PycharmProjects/GNOME-p3/monopoly_game_schema_v1-2.json'
+        game_schema = json.load(open(game_schema_file_path, 'r'))
+        game_elements = initialize_game_elements.initialize_board(game_schema, player_decision_agents)
+
+        # Simulate the performance of the genetic NN agent (player_3)
+        player_3 = game_elements['players'][2]  # Assuming player_3 is at index 2
+        simulated_gameboard = copy.deepcopy(game_elements)
+
+        # Simulate actions for the genetic NN agent
+        total_reward = 0
+        for _ in range(50):  # Simulate 50 decision steps
+            allowable_moves = ["buy_property", "skip_turn", "roll_dice", "end_turn"]
+            action_probs = model.predict(encode_game_state(player_3, simulated_gameboard)[np.newaxis, :])[0]
+            action_index = np.argmax(action_probs)
+            chosen_action = allowable_moves[action_index] if action_index < len(allowable_moves) else "skip_turn"
+
+            # Simulate the action
+            try:
+                reward = _simulate_action(
+                    getattr(player_decision_agents['player_3'], chosen_action, None),
+                    {},
+                    player_3,
+                    simulated_gameboard,
+                    num_simulations=1,
+                )
+                total_reward += reward
+            except Exception as e:
+                logger.warning(f"Error during simulation: {e}")
+                continue
+
+        return total_reward
+
+    # Initialize population
+    population = [generate_random_hyperparameters() for _ in range(population_size)]
+
+    for generation in range(num_generations):
+        logger.info(f"Starting generation {generation + 1}")
+
+        # Evaluate population
+        fitness_scores = [evaluate_hyperparameters(individual) for individual in population]
+
+        # Select top individuals
+        sorted_population = [x for _, x in sorted(zip(fitness_scores, population), key=lambda item: item[0], reverse=True)]
+        top_individuals = sorted_population[:population_size // 2]
+
+        # Crossover and mutation
+        new_population = []
+        while len(new_population) < population_size:
+            parent1, parent2 = random.sample(top_individuals, 2)
+            child = crossover(parent1, parent2)
+            child = mutate(child)
+            new_population.append(child)
+
+        population = new_population
+
+    # Return best individual from the final generation
+    best_hyperparameters = max(population, key=lambda ind: evaluate_hyperparameters(ind))
+    return best_hyperparameters
 
 
-# Initialize and train the model with the best hyperparameters
+def crossover(parent1, parent2):
+    """
+    Combine two parents to create a new individual.
+    """
+    child = {}
+    for key in parent1:
+        child[key] = random.choice([parent1[key], parent2[key]])
+    return child
+
+
+def mutate(individual):
+    """
+    Randomly mutate an individual's hyperparameters.
+    """
+    mutation_probability = 0.2
+    for key in individual:
+        if random.random() < mutation_probability:
+            if key == "learning_rate":
+                individual[key] = 10 ** random.uniform(np.log10(HYPERPARAMETER_RANGES[key][0]),
+                                                       np.log10(HYPERPARAMETER_RANGES[key][1]))
+            elif key in ["hidden_layer_1", "batch_size"]:
+                individual[key] = random.randint(HYPERPARAMETER_RANGES[key][0], HYPERPARAMETER_RANGES[key][1])
+            elif key == "gamma":
+                individual[key] = random.uniform(HYPERPARAMETER_RANGES[key][0], HYPERPARAMETER_RANGES[key][1])
+    return individual
+
+
+# Example usage of the genetic algorithm
 if __name__ == "__main__":
-    # Optimize hyperparameters using Scikit-Optimize
-    result = forest_minimize(
-        func=evaluate_model,
-        dimensions=search_space,
-        acq_func='EI',  # Expected Improvement
-        n_calls=50,  # Number of function evaluations
-        random_state=42
-    )
-
-    # Print the best hyperparameters found
-    print("Best hyperparameters:")
-    print(result.x)
-    # Best hyperparameters: {'learning_rate': 0.007967464438733727, 'hidden_layer_1': 334, 'batch_size': 138,
-    #                   'gamma': 0.9771894090270041}
-
-    # Initialize and train the model with the best hyperparameters
-    best_hyperparameters = {
-        "learning_rate": result.x[0],
-        "hidden_layer_1": result.x[1],
-        "batch_size": result.x[2],
-        "gamma": result.x[3]
-    }
+    best_hyperparameters = genetic_algorithm_optimization(num_generations=10, population_size=20)  # changed
     trained_model = initialize_model(best_hyperparameters)
     print(f"Best hyperparameters: {best_hyperparameters}")
     # Save the trained model
-    trained_model.save('my_model_v3.keras', include_optimizer=False)
+    trained_model.save('my_model_v3_2.keras', include_optimizer=False)
 
 
 # Load the trained model
-model_path = 'my_model_v3.keras'
+model_path = 'my_model_v3_2.keras'
 if os.path.exists(model_path):
     print(f"Loading model from {model_path}")
     trained_model = load_model(model_path)
@@ -203,7 +245,6 @@ def _nn_decision(player, current_gameboard, allowable_moves, code, phase):
         logger.warning("No allowable moves provided!")
         return "skip_turn", {}
     logger.debug(f"Allowable moves received: {allowable_moves}")
-    # Remaining logic...
 
     allowable_moves = list(allowable_moves)
     if not allowable_moves:
